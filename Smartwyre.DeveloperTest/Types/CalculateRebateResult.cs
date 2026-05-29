@@ -1,6 +1,7 @@
-﻿namespace Smartwyre.DeveloperTest.Types;
+namespace Smartwyre.DeveloperTest.Types;
 
-public class CalculateRebateResult
+public record CalculateRebateResult(bool Success)
 {
-    public bool Success { get; set; }
+    public static CalculateRebateResult Failed() => new(false);
+    public static CalculateRebateResult Successful() => new(true);
 }

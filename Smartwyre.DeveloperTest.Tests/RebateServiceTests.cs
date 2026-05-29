@@ -1,6 +1,7 @@
 using Moq;
 using Smartwyre.DeveloperTest.Data;
 using Smartwyre.DeveloperTest.Services;
+using Smartwyre.DeveloperTest.Services.Calculators;
 using Smartwyre.DeveloperTest.Types;
 using Xunit;
 
@@ -11,7 +12,14 @@ public class RebateServiceTests
     private readonly Mock<IRebateDataStore> _rebateStore = new();
     private readonly Mock<IProductDataStore> _productStore = new();
 
-    private RebateService CreateSut() => new(_rebateStore.Object, _productStore.Object);
+    private readonly IIncentiveCalculatorResolver _resolver = new IncentiveCalculatorResolver(new IIncentiveCalculator[]
+    {
+        new FixedCashAmountCalculator(),
+        new FixedRateRebateCalculator(),
+        new AmountPerUomCalculator(),
+    });
+
+    private RebateService CreateSut() => new(_rebateStore.Object, _productStore.Object, _resolver);
 
     private void SetupRebate(Rebate rebate) =>
         _rebateStore.Setup(s => s.GetRebate(It.IsAny<string>())).Returns(rebate);
@@ -59,7 +67,7 @@ public class RebateServiceTests
         _rebateStore.Verify(s => s.StoreCalculationResult(It.IsAny<Rebate>(), 50m), Times.Once);
     }
 
-    [Fact(Skip = "Documented bug: current switch dereferences rebate before null check. Fixed by Strategy refactor.")]
+    [Fact]
     public void Calculate_RebateNotFound_ReturnsFailureAndDoesNotStore()
     {
         SetupRebate(null!);
@@ -71,7 +79,7 @@ public class RebateServiceTests
         _rebateStore.Verify(s => s.StoreCalculationResult(It.IsAny<Rebate>(), It.IsAny<decimal>()), Times.Never);
     }
 
-    [Fact(Skip = "Documented bug: current switch dereferences product before null check. Fixed by Strategy refactor.")]
+    [Fact]
     public void Calculate_ProductNotFound_ReturnsFailureAndDoesNotStore()
     {
         SetupRebate(new Rebate { Incentive = IncentiveType.FixedCashAmount, Amount = 100m });

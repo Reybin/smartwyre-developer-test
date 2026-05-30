@@ -44,3 +44,55 @@ You are free to use any frameworks/NuGet packages that you see fit. You should p
 Feel free to use code comments to describe your changes. You are also welcome to update this readme with any important details for us to consider.
 
 Once you have completed the exercise either ensure your repository is available publicly or contact the hiring manager to set up a private share.
+
+---------------------------------------------------------------------------------------------------
+
+# Candidate Submission Notes
+
+## How to run
+
+Requires .NET 10 SDK.
+
+```bash
+# build everything
+dotnet build Smartwyre.DeveloperTest.sln
+
+# run all tests
+dotnet test Smartwyre.DeveloperTest.sln
+
+# run the console runner (asks for rebate id, product id, and volume)
+dotnet run --project Smartwyre.DeveloperTest.Runner
+```
+
+## Architecture
+
+The original `RebateService` mixed data lookup, three different calculation
+formulas, per-type validation, and persistence inside one method, all driven
+by a `switch` on `IncentiveType`. Adding a new incentive type meant modifying
+that switch, which violates the Open/Closed Principle the exercise explicitly
+asks to address.
+
+The refactor introduces a small **Strategy** for each incentive type behind a
+**Resolver** that maps `IncentiveType` to the matching strategy:
+
+```
+RebateService (orchestrator)
+    ├─ IRebateDataStore    ──►  RebateDataStore
+    ├─ IProductDataStore   ──►  ProductDataStore
+    └─ IIncentiveCalculatorResolver
+            └─ IIncentiveCalculator (per type)
+                    ├─ FixedCashAmountCalculator
+                    ├─ FixedRateRebateCalculator
+                    └─ AmountPerUomCalculator
+```
+
+`RebateService.Calculate` is now a thin orchestrator: it loads the rebate and
+product, asks the resolver for the right calculator, checks `CanCalculate`,
+calls `Calculate`, persists the result. Each calculator owns its own
+applicability rules and formula. Adding a new incentive type is a new class
+plus one DI registration line in the `Runner` composition root. The
+`RebateService` and other calculators stay untouched.
+
+`CalculateRebateResult` was made an immutable `record` with two factory
+methods (`Failed()` / `Successful()`) so callers can no longer accumulate
+state into it the way the original switch did.
